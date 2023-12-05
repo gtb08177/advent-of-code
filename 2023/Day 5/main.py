@@ -1,18 +1,27 @@
 
 import re
 
-class SeedToSoilEntry:
+class SourceToDestEntry:
     source = 0
     dest = 0
     range = 0
 
-    def __init__(self, source,dest,range):
-        self.source = source
+    def __init__(self, dest,source,range):
         self.dest = dest
-        self.range = dest
+        self.source = source
+        self.range = range
  
-    def maxDest(self):
-        return (self.dest + self.range - 1)
+    def getTarget(self,number):
+        return (number - self.source) + self.dest
+    
+    def isWithinSourceRange(self,number):
+        return self.source <= number < self.source + self.range
+    
+    def __str__(self):
+        return "source=" + str(self.source) + "|dest=" + str(self.dest) + "|range=" + str(self.range)
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 def parse_input(input_text):
@@ -35,23 +44,40 @@ def parse_input(input_text):
             # Extract the section name and convert it to lowercase
             current_section = line[:-1].lower()
             # Create an empty dictionary for the current section in the data dictionary
-            data[current_section] = {}
+            data[current_section] = []
         else:
             # Store the value of the line against the current known section
             values = list(map(int, line.split()))
-            data[current_section][tuple(values[:-1])] = values[-1]
+            dest = values[0]
+            source = values[1]
+            range = values[2]
+
+            current = SourceToDestEntry(dest,source,range)
+            data[current_section].append(current)
 
     return data
 
+def get_seed_numbers(lines):
+    first_line = lines[0]
+    return list(map(int,re.search("^seeds: (.*$)", first_line).groups()[0].split(" ")))
+
+def find_destination_for_map(map,source):
+    result = source
+
+    for entry in map:
+        if entry.isWithinSourceRange(source):
+            result = entry.getTarget(source)
+
+    return result
 
 try:
-    file_name = "input_test.txt"
+    file_name = "input.txt"
     with open(file_name, 'r') as file:
         lines = file.readlines()
 
         # pull out the seed numbers and delete from the remainder of the "file"
-        first_line = lines[0]
-        seeds = re.search("^seeds: (.*$)", first_line).groups()[0].split(" ")
+        seeds = get_seed_numbers(lines)
+        # delete the `seed` line from lines
         del lines[0]
 
         # search the remainder of the file for the remaining maps
@@ -65,14 +91,23 @@ try:
         temperature_to_humidity_map = parsed_data.get('temperature-to-humidity map', {})
         humidity_to_location_map = parsed_data.get('humidity-to-location map', {})
 
-        print("seeds:", seeds)
-        print("seed-to-soil map:", seed_to_soil_map)
-        print("soil-to-fertilizer map:", soil_to_fertilizer_map)
-        print("fertilizer-to-water map:", fertilizer_to_water_map)
-        print("water-to-light map:", water_to_light_map)
-        print("light-to-temperature map:", light_to_temperature_map)
-        print("temperature-to-humidity map:", temperature_to_humidity_map)
-        print("humidity-to-location map:", humidity_to_location_map)
+        lowest_running_loc = -1
+        for seed in seeds:
+            source = find_destination_for_map(seed_to_soil_map, seed)
+            source = find_destination_for_map(soil_to_fertilizer_map, source)
+            source = find_destination_for_map(fertilizer_to_water_map, source)
+            source = find_destination_for_map(water_to_light_map, source)
+            source = find_destination_for_map(light_to_temperature_map, source)
+            source = find_destination_for_map(temperature_to_humidity_map, source)
+            source = find_destination_for_map(humidity_to_location_map, source)
+
+            if(lowest_running_loc == -1):
+                lowest_running_loc = source
+            else:
+                lowest_running_loc = min(lowest_running_loc,source)
+    
+        print(lowest_running_loc)
+    
 
 except FileNotFoundError:
     print(f"Error: File '{file_name}' not found.")
